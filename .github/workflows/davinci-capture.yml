@@ -1,0 +1,37 @@
+name: davinci-capture
+on:
+  push:
+    branches: [davinci-cap]
+    paths: [".github/workflows/davinci-capture.yml", "capture-tool/**"]
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  capture:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - run: |
+          cd capture-tool
+          npm init -y >/dev/null
+          npm i playwright@1.49.1 >/dev/null
+          npx playwright install --with-deps chromium >/dev/null
+      - name: reachability
+        run: |
+          getent hosts davinci.ai || true
+          curl -sSIL -m 20 https://davinci.ai | head -15 || true
+      - name: capture
+        continue-on-error: true
+        run: |
+          cd capture-tool && node capture.mjs 2>&1 | tail -60
+          mv capture-out ../capture-out || true
+      - name: commit results
+        run: |
+          git config user.name capture-bot
+          git config user.email capture@example.com
+          git add -f capture-out || true
+          git commit -m "davinci capture results" || echo nothing
+          git push origin HEAD:davinci-cap
